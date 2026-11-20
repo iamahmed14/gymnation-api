@@ -1,0 +1,988 @@
+{
+  "info": {
+    "name": "GymNation API",
+    "description": "Run \"Happy flow\" first (it saves ids into collection variables), then \"Known errors\". Restart the server for a clean run — state is in memory.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "memberId",
+      "value": ""
+    },
+    {
+      "key": "bhMemberId",
+      "value": ""
+    },
+    {
+      "key": "agreementId",
+      "value": ""
+    },
+    {
+      "key": "bhAgreementId",
+      "value": ""
+    },
+    {
+      "key": "runId",
+      "value": ""
+    },
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Happy flow",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create member (SA, national phone)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "members"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Noura Al Harbi\",\n  \"country\": \"SA\",\n  \"phone\": \"055 123 4567\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('memberId', pm.response.json().id);",
+                  "pm.test('phone normalised', () => pm.expect(pm.response.json().phone).to.eql('+966551234567'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create member (BH)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "members"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ali Hassan\",\n  \"country\": \"BH\",\n  \"phone\": \"3600 1234\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('bhMemberId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lookup - international without +",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/members/lookup?phone=966551234567",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "members",
+                "lookup"
+              ],
+              "query": [
+                {
+                  "key": "phone",
+                  "value": "966551234567"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lookup - international with %2B",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/members/lookup?phone=%2B966551234567",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "members",
+                "lookup"
+              ],
+              "query": [
+                {
+                  "key": "phone",
+                  "value": "%2B966551234567"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Lookup - national with country",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/members/lookup?phone=055%20123%204567&country=SA",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "members",
+                "lookup"
+              ],
+              "query": [
+                {
+                  "key": "phone",
+                  "value": "055%20123%204567"
+                },
+                {
+                  "key": "country",
+                  "value": "SA"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create plan (SA)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"anytime-sa\",\n  \"country\": \"SA\",\n  \"monthly\": 29900,\n  \"joining_fee\": 0\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create plan (BH)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"anytime-bh\",\n  \"country\": \"BH\",\n  \"monthly\": 24500,\n  \"joining_fee\": 0\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create agreement (SA)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/agreements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "agreements"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"member_id\": \"{{memberId}}\",\n  \"plan_id\": \"anytime-sa\",\n  \"start_date\": \"2026-09-20\",\n  \"due_day\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('agreementId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create agreement (BH)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/agreements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "agreements"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"member_id\": \"{{bhMemberId}}\",\n  \"plan_id\": \"anytime-bh\",\n  \"start_date\": \"2026-09-15\",\n  \"due_day\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('bhAgreementId', pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List invoices (worked example)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/agreements/{{agreementId}}/invoices?from=2026-09-01&to=2026-12-31",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "agreements",
+                "{{agreementId}}",
+                "invoices"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-09-01"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('first invoice 12607', () => pm.expect(pm.response.json()[0].total).to.eql(12607));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create reconciliation run (worked example)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reconciliation/runs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reconciliation",
+                "runs"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"month\": \"2026-10\",\n  \"rows\": [\n    {\n      \"gateway_txn_id\": \"T-88121\",\n      \"agreement_id\": \"{{agreementId}}\",\n      \"amount\": 34385,\n      \"currency\": \"SAR\",\n      \"status\": \"SETTLED\",\n      \"attempted_on\": \"2026-10-01\"\n    },\n    {\n      \"gateway_txn_id\": \"T-88122\",\n      \"agreement_id\": \"{{bhAgreementId}}\",\n      \"amount\": 26950,\n      \"currency\": \"BHD\",\n      \"status\": \"DECLINED\",\n      \"attempted_on\": \"2026-10-02\"\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('runId', pm.response.json().id);",
+                  "pm.test('1 matched, 1 declined', () => { const s = pm.response.json().summary; pm.expect([s.MATCHED, s.DECLINED]).to.eql([1, 1]); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get reconciliation run",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reconciliation/runs/{{runId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reconciliation",
+                "runs",
+                "{{runId}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. Known errors",
+      "item": [
+        {
+          "name": "409 PHONE_TAKEN (same phone, other spelling)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "members"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Someone Else\",\n  \"country\": \"AE\",\n  \"phone\": \"+966-55-123-4567\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('error code PHONE_TAKEN', () => pm.expect(pm.response.json().error.code).to.eql('PHONE_TAKEN'));",
+                  "pm.test('existing_member_id', () => pm.expect(pm.response.json().error.existing_member_id).to.eql(pm.collectionVariables.get('memberId')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "422 INVALID_PHONE (00 prefix)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "members"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"X\",\n  \"country\": \"SA\",\n  \"phone\": \"00966551234567\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('error code INVALID_PHONE', () => pm.expect(pm.response.json().error.code).to.eql('INVALID_PHONE'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "422 VALIDATION (malformed JSON)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "members"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"name\": \"broken\""
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('error code VALIDATION', () => pm.expect(pm.response.json().error.code).to.eql('VALIDATION'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "422 PHONE_NEEDS_COUNTRY",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/members/lookup?phone=0551234567",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "members",
+                "lookup"
+              ],
+              "query": [
+                {
+                  "key": "phone",
+                  "value": "0551234567"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('error code PHONE_NEEDS_COUNTRY', () => pm.expect(pm.response.json().error.code).to.eql('PHONE_NEEDS_COUNTRY'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "422 PHONE_COUNTRY_MISMATCH",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/members/lookup?phone=%2B966551234567&country=AE",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "members",
+                "lookup"
+              ],
+              "query": [
+                {
+                  "key": "phone",
+                  "value": "%2B966551234567"
+                },
+                {
+                  "key": "country",
+                  "value": "AE"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('error code PHONE_COUNTRY_MISMATCH', () => pm.expect(pm.response.json().error.code).to.eql('PHONE_COUNTRY_MISMATCH'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "404 lookup NOT_FOUND",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/members/lookup?phone=966559999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "members",
+                "lookup"
+              ],
+              "query": [
+                {
+                  "key": "phone",
+                  "value": "966559999999"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('error code NOT_FOUND', () => pm.expect(pm.response.json().error.code).to.eql('NOT_FOUND'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "409 PLAN_EXISTS",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/plans",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "plans"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"anytime-sa\",\n  \"country\": \"SA\",\n  \"monthly\": 29900,\n  \"joining_fee\": 0\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 409', () => pm.response.to.have.status(409));",
+                  "pm.test('error code PLAN_EXISTS', () => pm.expect(pm.response.json().error.code).to.eql('PLAN_EXISTS'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "422 UNKNOWN_MEMBER",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/agreements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "agreements"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"member_id\": \"nope\",\n  \"plan_id\": \"anytime-sa\",\n  \"start_date\": \"2026-09-20\",\n  \"due_day\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('error code UNKNOWN_MEMBER', () => pm.expect(pm.response.json().error.code).to.eql('UNKNOWN_MEMBER'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "422 PLAN_COUNTRY_MISMATCH",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/agreements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "agreements"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"member_id\": \"{{memberId}}\",\n  \"plan_id\": \"anytime-bh\",\n  \"start_date\": \"2026-09-20\",\n  \"due_day\": 1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('error code PLAN_COUNTRY_MISMATCH', () => pm.expect(pm.response.json().error.code).to.eql('PLAN_COUNTRY_MISMATCH'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "422 INVALID_RANGE (to before from)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/agreements/{{agreementId}}/invoices?from=2026-12-01&to=2026-09-01",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "agreements",
+                "{{agreementId}}",
+                "invoices"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-12-01"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-09-01"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('error code INVALID_RANGE', () => pm.expect(pm.response.json().error.code).to.eql('INVALID_RANGE'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "404 invoices for unknown agreement",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/agreements/nope/invoices?from=2026-09-01&to=2026-12-31",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "agreements",
+                "nope",
+                "invoices"
+              ],
+              "query": [
+                {
+                  "key": "from",
+                  "value": "2026-09-01"
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('error code NOT_FOUND', () => pm.expect(pm.response.json().error.code).to.eql('NOT_FOUND'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "422 INVALID_ROWS (duplicate, outside month, currency)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/reconciliation/runs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reconciliation",
+                "runs"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"month\": \"2026-10\",\n  \"rows\": [\n    {\n      \"gateway_txn_id\": \"T-1\",\n      \"agreement_id\": \"{{agreementId}}\",\n      \"amount\": 34385,\n      \"currency\": \"SAR\",\n      \"status\": \"SETTLED\",\n      \"attempted_on\": \"2026-10-01\"\n    },\n    {\n      \"gateway_txn_id\": \"T-1\",\n      \"agreement_id\": \"{{agreementId}}\",\n      \"amount\": 34385,\n      \"currency\": \"SAR\",\n      \"status\": \"SETTLED\",\n      \"attempted_on\": \"2026-10-01\"\n    },\n    {\n      \"gateway_txn_id\": \"T-2\",\n      \"agreement_id\": \"{{agreementId}}\",\n      \"amount\": 34385,\n      \"currency\": \"SAR\",\n      \"status\": \"SETTLED\",\n      \"attempted_on\": \"2026-11-01\"\n    },\n    {\n      \"gateway_txn_id\": \"T-3\",\n      \"agreement_id\": \"{{agreementId}}\",\n      \"amount\": 34385,\n      \"currency\": \"AED\",\n      \"status\": \"SETTLED\",\n      \"attempted_on\": \"2026-10-01\"\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('error code INVALID_ROWS', () => pm.expect(pm.response.json().error.code).to.eql('INVALID_ROWS'));",
+                  "pm.test('4 row errors', () => pm.expect(pm.response.json().error.errors).to.have.length(4));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "404 unknown reconciliation run",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/reconciliation/runs/nope",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "reconciliation",
+                "runs",
+                "nope"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 404', () => pm.response.to.have.status(404));",
+                  "pm.test('error code NOT_FOUND', () => pm.expect(pm.response.json().error.code).to.eql('NOT_FOUND'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
