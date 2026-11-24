@@ -1,4 +1,4 @@
-import { AMOUNT_TOLERANCE, VERDICTS } from '../config';
+import { AMOUNT_TOLERANCE } from '../config';
 import { ExpectedInvoice, GatewayRow, ReconciledRow, UnmatchedInvoice, Verdict } from '../types';
 
 export interface RowError {
@@ -12,12 +12,15 @@ export function findRowErrors(
   rows: GatewayRow[],
   currencyOf: (agreementId: string) => string | undefined,
 ): RowError[] {
-  const errors: RowError[] = [];
-  const txnCounts = countBy(rows, (row) => row.gateway_txn_id);
+  const timesSeen = new Map<string, number>();
+  for (const row of rows) {
+    timesSeen.set(row.gateway_txn_id, (timesSeen.get(row.gateway_txn_id) ?? 0) + 1);
+  }
 
+  const errors: RowError[] = [];
   for (const row of rows) {
     const id = row.gateway_txn_id;
-    if (txnCounts.get(id)! > 1) errors.push({ gateway_txn_id: id, code: 'DUPLICATE_TXN' });
+    if (timesSeen.get(id)! > 1) errors.push({ gateway_txn_id: id, code: 'DUPLICATE_TXN' });
     if (!row.attempted_on.startsWith(`${month}-`)) errors.push({ gateway_txn_id: id, code: 'ROW_OUTSIDE_MONTH' });
 
     const planCurrency = currencyOf(row.agreement_id);
@@ -27,53 +30,68 @@ export function findRowErrors(
 }
 
 /**
- * Link each settled row to an expected invoice and give every row a verdict.
- * A row's link depends only on the row itself (linking never "uses up" an invoice),
+ * Match each payment to the invoice it pays and give every payment a verdict.
+ * A payment's match depends only on that payment (an invoice is never "used up"),
  * so the result is the same whatever order the rows come in.
  */
 export function reconcile(rows: GatewayRow[], expected: ExpectedInvoice[]) {
-  // 1. each settled row -> its invoice: same agreement, total within tolerance, earliest due date wins
-  const links = rows.map((row) => (row.status === 'SETTLED' ? findInvoice(row, expected) : null));
+  // 1. Which invoice does each payment pay? (declined payments pay nothing)
+  const paidInvoices = rows.map((row) => (row.status === 'SETTLED' ? findInvoice(row, expected) : undefined));
 
-  // 2. how many settled rows point at each invoice
-  const rowsPerInvoice = countBy(links.filter((inv) => inv !== null), invoiceKey);
+  // 2. How many payments landed on each invoice?
+  const paymentsPerInvoice = new Map<ExpectedInvoice, number>();
+  for (const invoice of paidInvoices) {
+    if (invoice) paymentsPerInvoice.set(invoice, (paymentsPerInvoice.get(invoice) ?? 0) + 1);
+  }
 
-  // 3. verdict per row, in request order
-  const reconciledRows: ReconciledRow[] = rows.map((row, i) => {
-    const inv = links[i];
+  // 3. Give each payment a verdict, keeping request order
+  const summary: Record<Verdict, number> = {
+    MATCHED: 0,
+    DUE_DAY_DRIFT: 0,
+    DOUBLE_CHARGE_RISK: 0,
+    MISSING_FROM_LEDGER: 0,
+    DECLINED: 0,
+  };
+
+  const resultRows: ReconciledRow[] = rows.map((row, i) => {
+    const invoice = paidInvoices[i];
+    const verdict = getVerdict(row, invoice, paymentsPerInvoice);
+    summary[verdict]++;
     return {
       gateway_txn_id: row.gateway_txn_id,
-      verdict: verdictFor(row, inv, inv ? rowsPerInvoice.get(invoiceKey(inv))! : 0),
-      invoice: inv ? { agreement_id: inv.agreement_id, invoice_no: inv.invoice_no } : null,
+      verdict,
+      invoice: invoice ? { agreement_id: invoice.agreement_id, invoice_no: invoice.invoice_no } : null,
     };
   });
 
-  const summary = Object.fromEntries(VERDICTS.map((v) => [v, 0])) as Record<Verdict, number>;
-  reconciledRows.forEach((row) => summary[row.verdict]++);
-
-  const unmatched_invoices: UnmatchedInvoice[] = expected
-    .filter((inv) => !rowsPerInvoice.has(invoiceKey(inv)))
+  // 4. Invoices nobody paid
+  const unmatchedInvoices: UnmatchedInvoice[] = expected
+    .filter((invoice) => !paymentsPerInvoice.has(invoice))
     .sort(byDueDate)
     .map(({ agreement_id, invoice_no, due_date, total, currency }) => ({ agreement_id, invoice_no, due_date, total, currency }));
 
-  return { summary, rows: reconciledRows, unmatched_invoices };
+  return { summary, rows: resultRows, unmatched_invoices: unmatchedInvoices };
 }
 
-function findInvoice(row: GatewayRow, expected: ExpectedInvoice[]): ExpectedInvoice | null {
+/** Same agreement, total within tolerance of the amount; if several fit, the earliest due date. */
+function findInvoice(row: GatewayRow, expected: ExpectedInvoice[]): ExpectedInvoice | undefined {
   const candidates = expected.filter(
-    (inv) => inv.agreement_id === row.agreement_id && Math.abs(inv.total - row.amount) <= AMOUNT_TOLERANCE,
+    (invoice) => invoice.agreement_id === row.agreement_id && Math.abs(invoice.total - row.amount) <= AMOUNT_TOLERANCE,
   );
-  return candidates.sort(byDueDate)[0] ?? null;
+  return candidates.sort(byDueDate)[0];
 }
 
-function verdictFor(row: GatewayRow, inv: ExpectedInvoice | null, rowsOnInvoice: number): Verdict {
+function getVerdict(
+  row: GatewayRow,
+  invoice: ExpectedInvoice | undefined,
+  paymentsPerInvoice: Map<ExpectedInvoice, number>,
+): Verdict {
   if (row.status === 'DECLINED') return 'DECLINED';
-  if (!inv) return 'MISSING_FROM_LEDGER';
-  if (rowsOnInvoice > 1) return 'DOUBLE_CHARGE_RISK';
-  return row.attempted_on === inv.due_date ? 'MATCHED' : 'DUE_DAY_DRIFT';
+  if (!invoice) return 'MISSING_FROM_LEDGER';
+  if (paymentsPerInvoice.get(invoice)! > 1) return 'DOUBLE_CHARGE_RISK';
+  if (row.attempted_on === invoice.due_date) return 'MATCHED';
+  return 'DUE_DAY_DRIFT';
 }
-
-const invoiceKey = (inv: ExpectedInvoice) => `${inv.agreement_id}#${inv.invoice_no}`;
 
 /** Sort by due_date, then agreement_id, then invoice_no (plain string order, not locale order). */
 function byDueDate(a: ExpectedInvoice, b: ExpectedInvoice): number {
@@ -81,9 +99,3 @@ function byDueDate(a: ExpectedInvoice, b: ExpectedInvoice): number {
 }
 
 const compare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
-
-function countBy<T>(items: T[], keyOf: (item: T) => string): Map<string, number> {
-  const counts = new Map<string, number>();
-  items.forEach((item) => counts.set(keyOf(item), (counts.get(keyOf(item)) ?? 0) + 1));
-  return counts;
-}
